@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: backend-musica
+    env: python
+    buildCommand: ""
+    startCommand: ./start.sh
+    plan: free
