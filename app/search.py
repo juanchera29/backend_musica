@@ -19,13 +19,11 @@ def formatear_duracion(segundos):
         return f"{minutos:02}:{segundos_restantes:02}"
 
 def buscar_sync(query: str):
-    ydl_opts = {
+    search_opts = {
         'quiet': True,
         'skip_download': True,
         'extract_flat': False,
-        'force_generic_extractor': False,
-        'default_search': 'ytsearch10',  # Buscar más resultados para filtrar los que fallen
-        'format': 'bestaudio/best',
+        'default_search': 'ytsearch10',
         'noplaylist': True,
         'geo_bypass': True,
         'geo_bypass_country': 'US',
@@ -33,21 +31,24 @@ def buscar_sync(query: str):
     }
 
     resultados = []
+
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(search_opts) as ydl:
             search_results = ydl.extract_info(query, download=False)
 
             for entry in search_results.get("entries", []):
                 try:
-                    if entry.get("id") and entry.get("title"):
+                    # Verificar que se puede extraer info completa del video
+                    video_info = ydl.extract_info(f"https://www.youtube.com/watch?v={entry['id']}", download=False)
+                    if video_info.get("formats"):
                         resultados.append({
                             "titulo": entry.get("title"),
                             "url": f"https://www.youtube.com/watch?v={entry.get('id')}",
                             "duracion": formatear_duracion(entry.get("duration")),
                             "miniatura": entry.get("thumbnail") or "No disponible",
                         })
-                except yt_dlp.utils.DownloadError:
-                    # Ignorar videos con restricciones
+                except Exception:
+                    # Ignorar videos restringidos o no disponibles
                     continue
 
         if not resultados:
