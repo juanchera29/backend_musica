@@ -20,36 +20,42 @@ def formatear_duracion(segundos):
 
 def buscar_sync(query: str):
     ydl_opts = {
-    'quiet': True,
-    'skip_download': True,
-    'extract_flat': False,
-    'force_generic_extractor': False,
-    'default_search': 'ytsearch5',
-    'format': 'bestaudio/best',
-    'noplaylist': True,
-    'geo_bypass': True,  #  Evita bloqueos por región
-    'geo_bypass_country': 'US',  #  Forzar país
-    'age_limit': 0,  #  Evitar restricciones de edad
-}
+        'quiet': True,
+        'skip_download': True,
+        'extract_flat': False,
+        'force_generic_extractor': False,
+        'default_search': 'ytsearch10',  # Buscar más resultados para filtrar los que fallen
+        'format': 'bestaudio/best',
+        'noplaylist': True,
+        'geo_bypass': True,
+        'geo_bypass_country': 'US',
+        'age_limit': 0,
+    }
 
-    
+    resultados = []
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             search_results = ydl.extract_info(query, download=False)
-            resultados = []
+
             for entry in search_results.get("entries", []):
-                resultados.append({
-                    "titulo": entry.get("title"),
-                    "url": f"https://www.youtube.com/watch?v={entry.get('id')}",
-                    "duracion": formatear_duracion(entry.get("duration")),
-                    "miniatura": entry.get("thumbnail") or "No disponible",
-                })
-            return resultados
-    except yt_dlp.utils.DownloadError as e:
-        # Video no disponible o con restricción
-        return {"error": f"Video no disponible: {str(e)}"}
+                try:
+                    if entry.get("id") and entry.get("title"):
+                        resultados.append({
+                            "titulo": entry.get("title"),
+                            "url": f"https://www.youtube.com/watch?v={entry.get('id')}",
+                            "duracion": formatear_duracion(entry.get("duration")),
+                            "miniatura": entry.get("thumbnail") or "No disponible",
+                        })
+                except yt_dlp.utils.DownloadError:
+                    # Ignorar videos con restricciones
+                    continue
+
+        if not resultados:
+            return {"error": "No se encontraron videos disponibles para esta búsqueda."}
+
+        return resultados
+
     except Exception as e:
-        # Otro error inesperado
         return {"error": f"Error al buscar: {str(e)}"}
 
 async def buscar_canciones(query: str):
@@ -61,6 +67,5 @@ async def buscar_canciones(query: str):
 async def api_buscar_canciones(query: str):
     resultados = await buscar_canciones(query)
     if isinstance(resultados, dict) and "error" in resultados:
-        # Si hubo error, devolverlo como respuesta HTTP clara
         raise HTTPException(status_code=400, detail=resultados["error"])
     return {"resultados": resultados}
