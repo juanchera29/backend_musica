@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 import yt_dlp
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -27,18 +27,26 @@ def buscar_sync(query: str):
         'default_search': 'ytsearch5',
         'format': 'bestaudio/best',
         'noplaylist': True,
+        'geo_bypass': True,  # Intentar saltar bloqueos geográficos
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        search_results = ydl.extract_info(query, download=False)
-        resultados = []
-        for entry in search_results.get("entries", []):
-            resultados.append({
-                "titulo": entry.get("title"),
-                "url": f"https://www.youtube.com/watch?v={entry.get('id')}",
-                "duracion": formatear_duracion(entry.get("duration")),
-                "miniatura": entry.get("thumbnail") or "No disponible",
-            })
-        return resultados
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            search_results = ydl.extract_info(query, download=False)
+            resultados = []
+            for entry in search_results.get("entries", []):
+                resultados.append({
+                    "titulo": entry.get("title"),
+                    "url": f"https://www.youtube.com/watch?v={entry.get('id')}",
+                    "duracion": formatear_duracion(entry.get("duration")),
+                    "miniatura": entry.get("thumbnail") or "No disponible",
+                })
+            return resultados
+    except yt_dlp.utils.DownloadError as e:
+        # Video no disponible o con restricción
+        return {"error": f"Video no disponible: {str(e)}"}
+    except Exception as e:
+        # Otro error inesperado
+        return {"error": f"Error al buscar: {str(e)}"}
 
 async def buscar_canciones(query: str):
     loop = asyncio.get_running_loop()
@@ -48,4 +56,7 @@ async def buscar_canciones(query: str):
 @router.get("/buscar")
 async def api_buscar_canciones(query: str):
     resultados = await buscar_canciones(query)
+    if isinstance(resultados, dict) and "error" in resultados:
+        # Si hubo error, devolverlo como respuesta HTTP clara
+        raise HTTPException(status_code=400, detail=resultados["error"])
     return {"resultados": resultados}
