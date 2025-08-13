@@ -20,15 +20,19 @@ def formatear_duracion(segundos):
 
 def buscar_sync(query: str):
     ydl_opts = {
-        'quiet': True,
-        'skip_download': True,
-        'extract_flat': False,
-        'force_generic_extractor': False,
-        'default_search': 'ytsearch5',
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'geo_bypass': True,  # Intentar saltar bloqueos geográficos
-    }
+    'quiet': True,
+    'skip_download': True,
+    'extract_flat': False,
+    'force_generic_extractor': False,
+    'default_search': 'ytsearch5',
+    'format': 'bestaudio/best',
+    'noplaylist': True,
+    'geo_bypass': True,  #  Evita bloqueos por región
+    'geo_bypass_country': 'US',  #  Forzar país
+    'age_limit': 0,  #  Evitar restricciones de edad
+}
+
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             search_results = ydl.extract_info(query, download=False)
