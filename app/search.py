@@ -1,10 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 import yt_dlp
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 router = APIRouter()
-
 executor = ThreadPoolExecutor(max_workers=2)
 
 def formatear_duracion(segundos):
@@ -19,11 +18,13 @@ def formatear_duracion(segundos):
         return f"{minutos:02}:{segundos_restantes:02}"
 
 def buscar_sync(query: str):
-    search_opts = {
+    ydl_opts = {
         'quiet': True,
         'skip_download': True,
         'extract_flat': False,
-        'default_search': 'ytsearch10',
+        'force_generic_extractor': False,
+        'default_search': 'ytsearch5',
+        'format': 'bestaudio/best',
         'noplaylist': True,
         'geo_bypass': True,
         'geo_bypass_country': 'US',
@@ -33,31 +34,26 @@ def buscar_sync(query: str):
     resultados = []
 
     try:
-        with yt_dlp.YoutubeDL(search_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             search_results = ydl.extract_info(query, download=False)
 
             for entry in search_results.get("entries", []):
-                try:
-                    # Verificar que se puede extraer info completa del video
-                    video_info = ydl.extract_info(f"https://www.youtube.com/watch?v={entry['id']}", download=False)
-                    if video_info.get("formats"):
-                        resultados.append({
-                            "titulo": entry.get("title"),
-                            "url": f"https://www.youtube.com/watch?v={entry.get('id')}",
-                            "duracion": formatear_duracion(entry.get("duration")),
-                            "miniatura": entry.get("thumbnail") or "No disponible",
-                        })
-                except Exception:
-                    # Ignorar videos restringidos o no disponibles
+                if entry is None:
                     continue
+                resultados.append({
+                    "titulo": entry.get("title"),
+                    "url": f"https://www.youtube.com/watch?v={entry.get('id')}",
+                    "duracion": formatear_duracion(entry.get("duration")),
+                    "miniatura": entry.get("thumbnail") or "No disponible",
+                })
 
-        if not resultados:
-            return {"error": "No se encontraron videos disponibles para esta búsqueda."}
+    except yt_dlp.utils.DownloadError:
+        # Si hay error con un video, simplemente devolvemos lista vacía
+        resultados = []
+    except Exception:
+        resultados = []
 
-        return resultados
-
-    except Exception as e:
-        return {"error": f"Error al buscar: {str(e)}"}
+    return resultados
 
 async def buscar_canciones(query: str):
     loop = asyncio.get_running_loop()
@@ -67,6 +63,4 @@ async def buscar_canciones(query: str):
 @router.get("/buscar")
 async def api_buscar_canciones(query: str):
     resultados = await buscar_canciones(query)
-    if isinstance(resultados, dict) and "error" in resultados:
-        raise HTTPException(status_code=400, detail=resultados["error"])
     return {"resultados": resultados}
